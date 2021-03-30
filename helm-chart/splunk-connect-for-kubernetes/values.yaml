@@ -73,8 +73,9 @@ splunk-kubernetes-logging:
     pathDest: /var/lib/docker/containers
     # Log format type, "json" or "cri"
     logFormatType: json
-    # Specify the log format for "cri" logFormatType
-    # It can be "%Y-%m-%dT%H:%M:%S.%N%:z" for openshift and "%Y-%m-%dT%H:%M:%S.%NZ" for IBM IKS
+    # Specify the logFormat for "cri" logFormatType - provide time format
+    # For example "%Y-%m-%dT%H:%M:%S.%N%:z" for openshift, "%Y-%m-%dT%H:%M:%S.%NZ" for IBM IKS 
+    # Default for "cri": "%Y-%m-%dT%H:%M:%S.%N%:z"
     logFormat:
     # Specify the interval of refreshing the list of watch file.
     refreshInterval:
@@ -97,6 +98,11 @@ splunk-kubernetes-logging:
     # a) RBAC is not enabled in the cluster, or
     # b) you want to create RBAC resources by yourself.
     create: true
+    # If you are on OpenShift and you want to run the a privileged pod
+    # you need to have a ClusterRoleBinding for the system:openshift:scc:privileged
+    # ClusterRole. Set to `true` to create the ClusterRoleBinding resource
+    # for the ServiceAccount.
+    openshiftPrivilegedSccBinding: false
 
   serviceAccount:
     # Specifies whether a ServiceAccount should be created
@@ -120,6 +126,8 @@ splunk-kubernetes-logging:
     # apparmor.security.beta.kubernetes.io/defaultProfileName:  'runtime/default'
     # set to false if AppArmor is not available
     apparmor_security: true
+    # apiGroup can be set to "extensions" for Kubernetes < 1.10.
+    apiGroup: policy
 
   # Local splunk configurations
   splunk:
@@ -175,6 +183,13 @@ splunk-kubernetes-logging:
 
   # Directory where to read journald logs.
   journalLogPath: /run/log/journal
+
+  # Set to true, to change the encoding of all strings to utf-8.
+  #
+  # By default fluentd uses ASCII-8BIT encoding. If you have 2-byte chars in your logs
+  # you need to set the encoding to UTF-8 instead.
+  #
+  charEncodingUtf8: false
 
   # `logs` defines the source of logs, multiline support, and their sourcetypes.
   #
@@ -346,7 +361,7 @@ splunk-kubernetes-logging:
     # The name of the image to pull
     name: splunk/fluentd-hec
     # The tag of the image to pull
-    tag: 1.2.4
+    tag: 1.2.5
     # The policy that specifies when the user wants the images to be pulled
     pullPolicy: IfNotPresent
     # Indicates if the image should be pulled using authentication from a secret
@@ -355,10 +370,7 @@ splunk-kubernetes-logging:
     pullsecretName:
 
   # Environment variable for daemonset
-  # Remove SSL_CERT_FILE environment variable when using OS CA file
   environmentVar:
-  - name: SSL_CERT_FILE
-    value: /fluentd/etc/splunk/hec_ca_file
 
   # Controls the resources used by the fluentd daemonset
   resources:
@@ -522,6 +534,8 @@ splunk-kubernetes-objects:
     # apparmor.security.beta.kubernetes.io/defaultProfileName:  'runtime/default'
     # set to false if AppArmor is not available
     apparmor_security: true
+    # apiGroup can be set to "extensions" for Kubernetes < 1.10.
+    apiGroup: policy
 
   # = Kubernetes Connection Configs =
   kubernetes:
@@ -661,13 +675,16 @@ splunk-kubernetes-objects:
     # The name of the image to pull
     name: splunk/kube-objects
     # The tag of the image to pull
-    tag: 1.1.4
+    tag: 1.1.5
     # The policy that specifies when the user wants the images to be pulled
     pullPolicy: IfNotPresent
     # Indicates if the image should be pulled using authentication from a secret
     usePullSecret: false
     # The name of the pull secret to attach to the respective serviceaccount used to pull the image
     pullSecretName:
+
+  # Environment variable for metrics daemonset
+  environmentVar:
 
   # = Resoruce Limitation Configs =
   resources:
@@ -803,6 +820,8 @@ splunk-kubernetes-metrics:
     # apparmor.security.beta.kubernetes.io/defaultProfileName:  'runtime/default'
     # set to false if AppArmor is not available
     apparmor_security: true
+    # apiGroup can be set to "extensions" for Kubernetes < 1.10.
+    apiGroup: policy
 
   # = Splunk HEC Connection =
   splunk:
@@ -845,7 +864,7 @@ splunk-kubernetes-metrics:
     # The name of the image to pull
     name: splunk/k8s-metrics
     # The tag of the image to pull
-    tag: 1.1.4
+    tag: 1.1.5
     # The policy that specifies when the user wants the images to be pulled
     pullPolicy: IfNotPresent
     # Indicates if the image should be pulled using authentication from a secret
@@ -860,7 +879,7 @@ splunk-kubernetes-metrics:
     # The name of the image to pull
     name: splunk/k8s-metrics-aggr
     # The tag of the image to pull
-    tag: 1.1.4
+    tag: 1.1.5
     # The policy that specifies when the user wants the images to be pulled
     pullPolicy: IfNotPresent
     # Indicates if the image should be pulled using authentication from a secret
@@ -868,6 +887,12 @@ splunk-kubernetes-metrics:
     # The name of the pull secret to attach to the respective serviceaccount used to pull the image
     pullsecretName:
 
+  # Environment variable for metrics daemonset
+  environmentVar:
+
+  # Environment variable for metrics aggregator pod
+  environmentVarAgg:
+      
   # Controls the resources used by the fluentd daemonset
   resources:
     fluent:

@@ -71,7 +71,9 @@ data:
     # Json Log Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
     # CRI Log Example (not supported):
-    # 2016-02-17T00:04:05.931087621Z stdout [info:2016-02-16T16:04:05.930-08:00] Some log text here
+    # 2016-02-17T00:04:05.931087621Z stdout P { 'long': { 'json', 'object output' },
+    # 2016-02-17T00:04:05.931087621Z stdout F 'splitted': 'partial-lines' }
+    # 2016-02-17T00:04:05.931087621Z stdout F [info:2016-02-16T16:04:05.930-08:00] Some log text here
     <source>
       @id containers.log
       @type tail
@@ -88,7 +90,7 @@ data:
       <parse>
       {{- if eq .Values.containers.logFormatType "cri" }}
         @type regexp
-        expression /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+        expression /^(?<time>.+) (?<stream>stdout|stderr)( (?<logtag>.))? (?<log>.*)$/
         time_format  {{ .Values.containers.logFormat | default "%Y-%m-%dT%H:%M:%S.%N%:z" }}
       {{- else if eq .Values.containers.logFormatType "json" }}
         @type json
@@ -184,7 +186,24 @@ data:
   output.conf: |-
     #Events are emitted to the CONCAT label from the container, file and journald sources for multiline processing.
     <label @CONCAT>
+      {{- if .Values.charEncodingUtf8 }}
+      # = set strings to uft-8 encoding =
+      <filter **>
+        @type record_modifier
+        char_encoding utf-8
+      </filter>
+      {{- end }}
       # = filters for container logs =
+      {{- if eq .Values.containers.logFormatType "cri" }}
+      <filter tail.containers.var.log.containers.**>
+        @type concat
+        key log
+        partial_key logtag
+        partial_value P
+        separator ''
+        timeout_label @SPLUNK
+      </filter>
+      {{- end }}
       {{- range $name, $logDef := .Values.logs }}
       {{- if and $logDef.from.pod $logDef.multiline }}
       <filter tail.containers.var.log.containers.{{ $logDef.from.pod }}*{{ or $logDef.from.container $name }}*.log>
@@ -408,6 +427,8 @@ data:
           label_{{ . }}
           {{- end }}
         </fields>
+        app_name {{ .Chart.Name }}
+        app_version {{ .Chart.Version }}
         {{- with .Values.buffer }}
         <buffer>
         {{- range $parameter, $value := . }}
