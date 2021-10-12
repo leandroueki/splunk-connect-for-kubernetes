@@ -2,7 +2,7 @@
 global:
   splunk:
     hec:
-      token: my-hec-token
+      token: 123456789
       host: my-hec-host
       port: my-hec-port
       indexName: main
